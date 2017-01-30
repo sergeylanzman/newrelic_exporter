@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/log"
 )
@@ -37,6 +39,21 @@ func init() {
 	LinkRexp = regexp.MustCompile(rexp)
 }
 
+type Config struct {
+	// NewRelic related settings
+	NRApiKey		string			`yaml:"api.key"`
+	NRApiServer		string			`yaml:"api.server"`
+	NRPeriod		int			`yaml:"api.period"`
+	NRTimeout		time.Duration		`yaml:"api.timeout"`
+	NRService		string			`yaml:"api.service"`
+	NRApps			[]int			`yaml:"api.apps"`
+	NRMetricFilters		[]string		`yaml:"api.metric-filters"`
+
+	// Prometheus Exporter related settings
+	MetricPath		string			`yaml:"web.telemetry-path"`
+	ListenAddress		string			`yaml:"web.listen-address"`
+}
+
 type Metric struct {
 	App   string
 	Name  string
@@ -55,8 +72,8 @@ type AppList struct {
 }
 
 func (a *AppList) get(api *newRelicAPI) error {
-	log.Debugf("Requesting application list from %s.", api.server.String())
-	body, err := api.req("/v2/applications.json", "")
+	log.Infof("Requesting application list from %s.", api.server.String())
+	body, err := api.req("/v2/%s.json", api.service)
 	if err != nil {
 		log.Error("Error getting application list: ", err)
 		return err
@@ -64,7 +81,6 @@ func (a *AppList) get(api *newRelicAPI) error {
 
 	dec := json.NewDecoder(bytes.NewReader(body))
 	for {
-
 		page := new(AppList)
 		if err := dec.Decode(page); err == io.EOF {
 			break
@@ -74,7 +90,6 @@ func (a *AppList) get(api *newRelicAPI) error {
 		}
 
 		a.Applications = append(a.Applications, page.Applications...)
-
 	}
 
 	return nil
@@ -110,8 +125,8 @@ type MetricNames struct {
 }
 
 func (m *MetricNames) get(api *newRelicAPI, appID int) error {
-	log.Debugf("Requesting metrics names for application id %d.", appID)
-	path := fmt.Sprintf("/v2/applications/%s/metrics.json", strconv.Itoa(appID))
+	log.Infof("Requesting metrics names for application id %d.", appID)
+	path := fmt.Sprintf("/v2/%s/%s/metrics.json", api.service, strconv.Itoa(appID))
 
 	body, err := api.req(path, "")
 	if err != nil {
@@ -148,7 +163,7 @@ type MetricData struct {
 }
 
 func (m *MetricData) get(api *newRelicAPI, appID int, names MetricNames) error {
-	path := fmt.Sprintf("/v2/applications/%s/metrics/data.json", strconv.Itoa(appID))
+	path := fmt.Sprintf("/v2/%s/%s/metrics/data.json", api.service, strconv.Itoa(appID))
 
 	var nameList []string
 
@@ -157,7 +172,7 @@ func (m *MetricData) get(api *newRelicAPI, appID int, names MetricNames) error {
 		// unencoded names which it cannot read
 		nameList = append(nameList, names.Metrics[i].Name)
 	}
-	log.Debugf("Requesting %d metrics for application id %d.", len(nameList), appID)
+	log.Infof("Requesting %d metrics for application id %d.", len(nameList), appID)
 
 	// Because the Go client does not yet support 100-continue
 	// ( see issue #3665 ),
@@ -235,7 +250,7 @@ func (m *MetricData) get(api *newRelicAPI, appID int, names MetricNames) error {
 	return nil
 }
 
-func (m *MetricData) sendMetrics(ch chan<- Metric, app string) {
+func (m *MetricData) sendMetrics(ch chan <- Metric, app string) {
 	for _, set := range m.Metric_Data.Metrics {
 
 		if len(set.Timeslices) == 0 {
@@ -289,13 +304,13 @@ func NewExporter() *Exporter {
 	}
 }
 
-func (e *Exporter) scrape(ch chan<- Metric) {
+func (e *Exporter) scrape(ch chan <- Metric) {
 
 	e.error.Set(0)
 	e.totalScrapes.Inc()
 
 	now := time.Now().UnixNano()
-	log.Debugf("Starting new scrape at %d.", now)
+	log.Infof("Starting new scrape at %d.", now)
 
 	var apps AppList
 	err := apps.get(e.api)
@@ -321,6 +336,7 @@ func (e *Exporter) scrape(ch chan<- Metric) {
 			var names MetricNames
 
 			err = names.get(api, app.ID)
+			log.Infof("Scraped %v metrics for app %v", len(names.Metrics), app.ID)
 			if err != nil {
 				log.Error(err)
 				e.error.Set(1)
@@ -329,6 +345,7 @@ func (e *Exporter) scrape(ch chan<- Metric) {
 			var data MetricData
 
 			err = data.get(api, app.ID, names)
+			log.Infof("Scraped %v metric datas for app %v", len(data.Metric_Data.Metrics), app.ID)
 			if err != nil {
 				log.Error(err)
 				e.error.Set(1)
@@ -408,6 +425,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 type newRelicAPI struct {
 	server          url.URL
 	apiKey          string
+	service		string
 	from            time.Time
 	to              time.Time
 	period          int
@@ -415,7 +433,7 @@ type newRelicAPI struct {
 	client          *http.Client
 }
 
-func NewNewRelicAPI(server string, apikey string, timeout time.Duration) *newRelicAPI {
+func NewNewRelicAPI(server string, apikey string, service string, timeout time.Duration) *newRelicAPI {
 	parsed, err := url.Parse(server)
 	if err != nil {
 		log.Fatal("Could not parse API URL: ", err)
@@ -423,9 +441,13 @@ func NewNewRelicAPI(server string, apikey string, timeout time.Duration) *newRel
 	if apikey == "" {
 		log.Fatal("Cannot continue without an API key.")
 	}
+	if service == "" {
+		log.Fatal("Cannot continue without NewRelic service selected")
+	}
 	return &newRelicAPI{
 		server: *parsed,
 		apiKey: apikey,
+		service: service,
 		client: &http.Client{Timeout: timeout},
 	}
 }
@@ -487,42 +509,42 @@ func (a *newRelicAPI) httpget(req *http.Request, in []byte) (out []byte, err err
 }
 
 func main() {
-	var server, apikey, listenAddress, metricPath string
-	var period int
-	var timeout time.Duration
-	var err error
+	var config Config
+	var configFile string
 
-	flag.StringVar(&apikey, "api.key", "", "NewRelic API key")
-	flag.StringVar(&server, "api.server", "https://api.newrelic.com", "NewRelic API URL")
-	flag.IntVar(&period, "api.period", 60, "Period of data to extract in seconds")
-	flag.DurationVar(&timeout, "api.timeout", 5*time.Second, "Period of time to wait for an API response in seconds")
-
-	flag.StringVar(&listenAddress, "web.listen-address", ":9126", "Address to listen on for web interface and telemetry.")
-	flag.StringVar(&metricPath, "web.telemetry-path", "/metrics", "Path under which to expose metrics.")
-
+	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 
-	api := NewNewRelicAPI(server, apikey, timeout)
-	api.period = period
+	configSource, err := ioutil.ReadFile(configFile)
+	if (err != nil) {
+		panic(err)
+	}
+	err = yaml.Unmarshal(configSource, &config)
+	if (err != nil) {
+		panic(err)
+	}
+
+	api := NewNewRelicAPI(config.NRApiServer, config.NRApiKey, config.NRService, config.NRTimeout)
+	api.period = config.NRPeriod
 	exporter := NewExporter()
 	exporter.api = api
 
 	prometheus.MustRegister(exporter)
 
-	http.Handle(metricPath, prometheus.Handler())
+	http.Handle(config.MetricPath, prometheus.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
 <head><title>NewRelic exporter</title></head>
 <body>
 <h1>NewRelic exporter</h1>
-<p><a href='` + metricPath + `'>Metrics</a></p>
+<p><a href='` + config.MetricPath + `'>Metrics</a></p>
 </body>
 </html>
 `))
 	})
 
-	log.Printf("Listening on %s.", listenAddress)
-	err = http.ListenAndServe(listenAddress, nil)
+	log.Printf("Listening on %s.", config.ListenAddress)
+	err = http.ListenAndServe(config.ListenAddress, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
