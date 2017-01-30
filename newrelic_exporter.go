@@ -35,6 +35,8 @@ const UserAgent = "NewRelic Exporter"
 var rexp = `<([[:graph:]]+)>; rel="next"`
 var LinkRexp *regexp.Regexp
 
+var config Config
+
 func init() {
 	LinkRexp = regexp.MustCompile(rexp)
 }
@@ -62,16 +64,27 @@ type Metric struct {
 }
 
 type AppList struct {
-	Applications []struct {
-		ID         int
-		Name       string
-		Health     string             `json:"health_status"`
-		AppSummary map[string]float64 `json:"application_summary"`
-		UsrSummary map[string]float64 `json:"end_user_summary"`
-	}
+	Applications []Application
+}
+
+type Application struct {
+	ID         int
+	Name       string
+	Health     string             `json:"health_status"`
+	AppSummary map[string]float64 `json:"application_summary"`
+	UsrSummary map[string]float64 `json:"end_user_summary"`
 }
 
 func (a *AppList) get(api *newRelicAPI) error {
+	if len(config.NRApps) > 0 {
+		// Using local app list instead of getting it from API
+		log.Infof("Getting application list from config: %v", config.NRApps)
+		for _, id := range config.NRApps {
+			a.Applications = append(a.Applications, Application{ID: id})
+		}
+		return nil
+	}
+
 	log.Infof("Requesting application list from %s.", api.server.String())
 	body, err := api.req("/v2/%s.json", api.service)
 	if err != nil {
@@ -509,7 +522,6 @@ func (a *newRelicAPI) httpget(req *http.Request, in []byte) (out []byte, err err
 }
 
 func main() {
-	var config Config
 	var configFile string
 
 	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
