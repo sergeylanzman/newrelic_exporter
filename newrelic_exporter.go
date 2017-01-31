@@ -21,6 +21,7 @@ import (
 	"github.com/prometheus/log"
 
 	"github.com/tomnomnom/linkheader"
+	"crypto/tls"
 )
 
 // Chunk size of metric requests
@@ -134,24 +135,32 @@ func (m *MetricNames) get(api *newRelicAPI, appID int) error {
 	log.Infof("Requesting metrics names for application id %d.", appID)
 	path := fmt.Sprintf("/v2/%s/%s/metrics.json", api.service, strconv.Itoa(appID))
 
-	body, err := api.req(path, "")
-	if err != nil {
-		log.Error("Error getting metric names: ", err)
-		return err
-	}
+	// We will only make filtered requests for metric names. Otherwise there are too many of them (tens of thousands)
+	for _, filter := range config.NRMetricFilters {
+		log.Infof("With filter '%s'", filter)
 
-	dec := json.NewDecoder(bytes.NewReader(body))
+		params := url.Values{}
+		params.Add("name", filter)
 
-	for {
-		var part MetricNames
-		if err = dec.Decode(&part); err == io.EOF {
-			break
-		} else if err != nil {
-			log.Error("Error decoding metric names: ", err)
+		body, err := api.req(path, params.Encode())
+		if err != nil {
+			log.Error("Error getting metric names: ", err)
 			return err
 		}
-		tmpMetrics := append(m.Metrics, part.Metrics...)
-		m.Metrics = tmpMetrics
+
+		dec := json.NewDecoder(bytes.NewReader(body))
+
+		for {
+			var part MetricNames
+			if err = dec.Decode(&part); err == io.EOF {
+				break
+			} else if err != nil {
+				log.Error("Error decoding metric names: ", err)
+				return err
+			}
+			tmpMetrics := append(m.Metrics, part.Metrics...)
+			m.Metrics = tmpMetrics
+		}
 	}
 
 	return nil
@@ -450,11 +459,23 @@ func NewNewRelicAPI(server string, apikey string, service string, timeout time.D
 	if service == "" {
 		log.Fatal("Cannot continue without NewRelic service selected")
 	}
+
+	client := &http.Client{Timeout: timeout}
+
+	debugMode := true
+	if debugMode {
+		proxyUrl, _ := url.Parse("https://localhost:8888")
+		transport := &http.Transport{}
+		transport.Proxy = http.ProxyURL(proxyUrl)
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		client.Transport = transport
+	}
+
 	return &newRelicAPI{
 		server: *parsed,
 		apiKey: apikey,
 		service: service,
-		client: &http.Client{Timeout: timeout},
+		client: client,
 	}
 }
 
@@ -496,7 +517,7 @@ func (a *newRelicAPI) httpget(req *http.Request, in []byte) (out []byte, err err
 	out = append(in, body...)
 
 	// Read the link header to see if we need to read more pages.
-	links := linkheader.Parse(resp.Header["Link"][0])
+	links := linkheader.Parse(resp.Header.Get("Link"))
 	for _, l := range links {
 		if l.Rel == "next" {
 			u := new(url.URL)
