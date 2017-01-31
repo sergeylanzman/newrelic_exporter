@@ -80,7 +80,7 @@ func (a *AppList) get(api *newRelicAPI) error {
 	}
 
 	log.Infof("Requesting application list from %s.", api.server.String())
-	body, err := api.req("/v2/%s.json", api.service)
+	body, err := api.req(fmt.Sprintf("/v2/%s.json", api.service), "")
 	if err != nil {
 		log.Error("Error getting application list: ", err)
 		return err
