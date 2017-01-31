@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -20,6 +19,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/log"
+
+	"github.com/tomnomnom/linkheader"
 )
 
 // Chunk size of metric requests
@@ -31,15 +32,7 @@ const NameSpace = "newrelic"
 // User-Agent string
 const UserAgent = "NewRelic Exporter"
 
-// Regular expression to parse Link headers
-var rexp = `<([[:graph:]]+)>; rel="next"`
-var LinkRexp *regexp.Regexp
-
 var config Config
-
-func init() {
-	LinkRexp = regexp.MustCompile(rexp)
-}
 
 type Config struct {
 	// NewRelic related settings
@@ -77,7 +70,7 @@ type Application struct {
 
 func (a *AppList) get(api *newRelicAPI) error {
 	if len(config.NRApps) > 0 {
-		// Using local app list instead of getting it from API
+		// Using local app list instead of getting it from API - one API call less
 		log.Infof("Getting application list from config: %v", config.NRApps)
 		for _, id := range config.NRApps {
 			a.Applications = append(a.Applications, Application{ID: id})
@@ -503,21 +496,21 @@ func (a *newRelicAPI) httpget(req *http.Request, in []byte) (out []byte, err err
 	out = append(in, body...)
 
 	// Read the link header to see if we need to read more pages.
-	link := resp.Header.Get("Link")
-	vals := LinkRexp.FindStringSubmatch(link)
+	links := linkheader.Parse(resp.Header["Link"][0])
+	for _, l := range links {
+		if l.Rel == "next" {
+			u := new(url.URL)
 
-	if len(vals) == 2 {
-		// Regexp matched, read get next page
+			u, err = url.Parse(l.URL)
+			if err != nil {
+				return
+			}
+			req.URL = u
 
-		u := new(url.URL)
-
-		u, err = url.Parse(vals[1])
-		if err != nil {
-			return
+			return a.httpget(req, out)
 		}
-		req.URL = u
-		return a.httpget(req, out)
 	}
+
 	return
 }
 
