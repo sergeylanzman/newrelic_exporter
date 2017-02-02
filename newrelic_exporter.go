@@ -518,15 +518,33 @@ func (a *newRelicAPI) httpget(req *http.Request, in []byte) (out []byte, err err
 
 	// Read the link header to see if we need to read more pages.
 	links := linkheader.Parse(resp.Header.Get("Link"))
-	for _, l := range links {
-		if l.Rel == "next" {
-			u := new(url.URL)
 
-			u, err = url.Parse(l.URL)
-			if err != nil {
-				return
-			}
-			req.URL = u
+	relLast := links.FilterByRel("last")
+	if len(relLast) > 0 {
+		u, err := url.Parse(relLast[0].URL)
+		if err != nil {
+			log.Errorf("Error parsing 'last' relation link. %v", err)
+		}
+		log.Debugf("Found %v pages for %s", u.Query().Get("page"), req.URL)
+	}
+
+	relNext := links.FilterByRel("next")
+	if len(relNext) > 0 {
+		u := new(url.URL)
+
+		u, err = url.Parse(relNext[0].URL)
+		if err != nil {
+			return
+		}
+		cursor := u.Query().Get("cursor")
+
+		if cursor != "" {
+			query := req.URL.Query()
+
+			query.Set("cursor", cursor)
+			query.Del("page")
+
+			req.URL.RawQuery = query.Encode()
 
 			return a.httpget(req, out)
 		}
@@ -542,11 +560,11 @@ func main() {
 	flag.Parse()
 
 	configSource, err := ioutil.ReadFile(configFile)
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 	err = yaml.Unmarshal(configSource, &config)
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 
