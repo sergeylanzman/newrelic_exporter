@@ -124,42 +124,81 @@ func (a *AppList) sendMetrics(ch chan<- Metric) {
 	}
 }
 
-type MetricNames struct {
-	Metrics []struct {
-		Name   string
-		Values []string
-	}
-}
+type MetricNames map[string][]string
 
 func (m *MetricNames) get(api *newRelicAPI, appID int) error {
 	log.Infof("Requesting metrics names for application id %d.", appID)
 	path := fmt.Sprintf("/v2/%s/%s/metrics.json", api.service, strconv.Itoa(appID))
 
 	// We will only make filtered requests for metric names. Otherwise there are too many of them (tens of thousands)
-	for _, filter := range config.NRMetricFilters {
-		log.Infof("With filter '%s'", filter)
+	var i int
+	var filter string
+	channel := make(chan MetricNames)
 
-		params := url.Values{}
-		params.Add("name", filter)
+	for i, filter = range config.NRMetricFilters {
+		go func(filter string, ch chan<- MetricNames, counter int) error {
+			params := url.Values{}
+			params.Add("name", filter)
 
-		body, err := api.req(path, params.Encode())
-		if err != nil {
-			log.Error("Error getting metric names: ", err)
-			return err
-		}
-
-		dec := json.NewDecoder(bytes.NewReader(body))
-
-		for {
-			var part MetricNames
-			if err = dec.Decode(&part); err == io.EOF {
-				break
-			} else if err != nil {
-				log.Error("Error decoding metric names: ", err)
+			body, err := api.req(path, params.Encode())
+			if err != nil {
+				log.Error("Error getting metric names: ", err)
 				return err
 			}
-			tmpMetrics := append(m.Metrics, part.Metrics...)
-			m.Metrics = tmpMetrics
+
+			dec := json.NewDecoder(bytes.NewReader(body))
+
+			metricNamesBuffer := make(MetricNames)
+			var lastKey string
+			var curName string
+			var curValues []string
+
+			for {
+				t, err := dec.Token()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				if t == "metrics" || t == "name" || t == "values" {
+					lastKey = t.(string)
+					continue
+				}
+
+				if _, ok := t.(json.Delim); ok {
+					continue
+				}
+
+				if lastKey == "name" {
+					curName = t.(string)
+				} else if lastKey == "values" {
+					curValues = append(curValues, t.(string))
+				}
+
+				if !dec.More() && lastKey == "values" {
+					// finalizing metric addition
+					metricNamesBuffer[curName] = curValues
+					curValues = curValues[0:0]
+				}
+			}
+
+			ch <- metricNamesBuffer
+
+			return nil
+		}(filter, channel, i)
+	}
+
+	for {
+		mnBuffer := <-channel
+		mm := *m
+		for mn, mv := range mnBuffer {
+			mm[mn] = mv
+		}
+
+		if i--; i < 0 {
+			break
 		}
 	}
 
@@ -182,10 +221,10 @@ func (m *MetricData) get(api *newRelicAPI, appID int, names MetricNames) error {
 
 	var nameList []string
 
-	for i := range names.Metrics {
+	for name, _ := range names {
 		// We urlencode the metric names as the API will return
 		// unencoded names which it cannot read
-		nameList = append(nameList, names.Metrics[i].Name)
+		nameList = append(nameList, name)
 	}
 	log.Infof("Requesting %d metrics for application id %d.", len(nameList), appID)
 
@@ -324,8 +363,8 @@ func (e *Exporter) scrape(ch chan <- Metric) {
 	e.error.Set(0)
 	e.totalScrapes.Inc()
 
-	now := time.Now().UnixNano()
-	log.Infof("Starting new scrape at %d.", now)
+	startTime := time.Now()
+	log.Infof("Starting new scrape at %v.", startTime)
 
 	var apps AppList
 	err := apps.get(e.api)
@@ -348,10 +387,10 @@ func (e *Exporter) scrape(ch chan <- Metric) {
 		go func() {
 
 			defer wg.Done()
-			var names MetricNames
+			names := make(MetricNames)
 
 			err = names.get(api, app.ID)
-			log.Infof("Scraped %v metrics for app %v", len(names.Metrics), app.ID)
+			log.Infof("Scraped %v metrics for app %v", len(names), app.ID)
 			if err != nil {
 				log.Error(err)
 				e.error.Set(1)
@@ -359,7 +398,7 @@ func (e *Exporter) scrape(ch chan <- Metric) {
 
 			var data MetricData
 
-			err = data.get(api, app.ID, names)
+			//err = data.get(api, app.ID, names)
 			log.Infof("Scraped %v metric datas for app %v", len(data.Metric_Data.Metrics), app.ID)
 			if err != nil {
 				log.Error(err)
@@ -375,7 +414,7 @@ func (e *Exporter) scrape(ch chan <- Metric) {
 	wg.Wait()
 
 	close(ch)
-	e.duration.Set(float64(time.Now().UnixNano()-now) / 1000000000)
+	e.duration.Set(float64(time.Now().UnixNano()- startTime.UnixNano()) / 1000000000)
 }
 
 func (e *Exporter) recieve(ch <-chan Metric) {
