@@ -1,7 +1,5 @@
 package main
 
-// TODO: implement JSON parser that loops through the output from api.Get()
-
 import (
 	"bytes"
 	"encoding/json"
@@ -42,7 +40,7 @@ type Config struct {
 	NRPeriod		int			`yaml:"api.period"`
 	NRTimeout		time.Duration		`yaml:"api.timeout"`
 	NRService		string			`yaml:"api.service"`
-	NRApps			[]int			`yaml:"api.apps"`
+	NRApps			[]Application		`yaml:"api.apps"`
 	NRMetricFilters		[]string		`yaml:"api.metric-filters"`
 
 	// Prometheus Exporter related settings
@@ -62,8 +60,8 @@ type AppList struct {
 }
 
 type Application struct {
-	ID         int
-	Name       string
+	ID         int                `yaml:"id"`
+	Name       string             `yaml:"name"`
 	Health     string             `json:"health_status"`
 	AppSummary map[string]float64 `json:"application_summary"`
 	UsrSummary map[string]float64 `json:"end_user_summary"`
@@ -73,9 +71,7 @@ func (a *AppList) get(api *newRelicAPI) error {
 	if len(config.NRApps) > 0 {
 		// Using local app list instead of getting it from API - one API call less
 		log.Infof("Getting application list from config: %v", config.NRApps)
-		for _, id := range config.NRApps {
-			a.Applications = append(a.Applications, Application{ID: id})
-		}
+		a.Applications = append(a.Applications, config.NRApps...)
 		return nil
 	}
 
