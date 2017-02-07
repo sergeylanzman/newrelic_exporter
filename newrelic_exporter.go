@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"camino.ru/newrelic_exporter/config"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/log"
@@ -31,23 +31,7 @@ const NameSpace = "newrelic"
 // User-Agent string
 const UserAgent = "NewRelic Exporter"
 
-var config Config
-
-type Config struct {
-	// NewRelic related settings
-	NRApiKey		string			`yaml:"api.key"`
-	NRApiServer		string			`yaml:"api.server"`
-	NRPeriod		int			`yaml:"api.period"`
-	NRTimeout		time.Duration		`yaml:"api.timeout"`
-	NRService		string			`yaml:"api.service"`
-	NRApps			[]Application		`yaml:"api.apps"`
-	NRMetricFilters		[]string		`yaml:"api.metric-filters"`
-	NRValueFilters		[]string		`yaml:"api.value-filters"`
-
-	// Prometheus Exporter related settings
-	MetricPath		string			`yaml:"web.telemetry-path"`
-	ListenAddress		string			`yaml:"web.listen-address"`
-}
+var cfg config.Config
 
 type Metric struct {
 	App   string
@@ -69,10 +53,12 @@ type Application struct {
 }
 
 func (a *AppList) get(api *newRelicAPI) error {
-	if len(config.NRApps) > 0 {
+	if len(cfg.NRApps) > 0 {
 		// Using local app list instead of getting it from API - one API call less
-		log.Infof("Getting application list from config: %v", config.NRApps)
-		a.Applications = append(a.Applications, config.NRApps...)
+		log.Infof("Getting application list from config: %v", cfg.NRApps)
+		for _, app := range cfg.NRApps {
+			a.Applications = append(a.Applications, Application{ID: app.Id, Name: app.Name})
+		}
 		return nil
 	}
 
@@ -132,7 +118,7 @@ func (m *MetricNames) get(api *newRelicAPI, appID int) error {
 	var filter string
 	channel := make(chan MetricNames)
 
-	for i, filter = range config.NRMetricFilters {
+	for i, filter = range cfg.NRMetricFilters {
 		go func(filter string, ch chan<- MetricNames, counter int) error {
 			params := url.Values{}
 			params.Add("name", filter)
@@ -254,8 +240,8 @@ func (m *MetricData) get(api *newRelicAPI, appID int, names MetricNames) error {
 				params.Add("names[]", thisName)
 			}
 
-			if len(config.NRValueFilters) > 0 {
-				for _, valueFilter := range config.NRValueFilters {
+			if len(cfg.NRValueFilters) > 0 {
+				for _, valueFilter := range cfg.NRValueFilters {
 					params.Add("values[]", valueFilter)
 				}
 			}
@@ -601,14 +587,7 @@ func main() {
 	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 
-	configSource, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		panic(err)
-	}
-	err = yaml.Unmarshal(configSource, &config)
-	if err != nil {
-		panic(err)
-	}
+	config, err := config.GetConfig(configFile)
 
 	api := NewNewRelicAPI(config.NRApiServer, config.NRApiKey, config.NRService, config.NRTimeout)
 	api.period = config.NRPeriod
