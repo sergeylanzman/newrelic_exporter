@@ -14,11 +14,20 @@ api.timeout: 15s
 # See NR API docs for details: https://rpm.newrelic.com/api/explore
 api.service: "applications"
 
-# List of filters for metric names. Corresponds to 'name' parameter of metrics.json. Each line will generate at least one separate API request so use them wisely.
-api.metric-filters:
-
 # List of NewRelic application IDs. If none set than exporter will get app list from API
 api.apps:
+
+# List of filters for metric names
+# Corresponds to 'name' parameter of metrics.json
+# Each line will generate at least one separate API request
+api.metric-filters:
+
+# List of value names to collect
+# Corresponds to 'values[]' field of data.json
+# If empty - all possible values will be collected
+api.value-filters:
+#  - average_response_time
+#  - calls_per_minute
 
 # Address to listen on for web interface and telemetry. Port defaults to 9126.
 web.listen-address:	":9126"
