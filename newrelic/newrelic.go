@@ -40,7 +40,9 @@ type NewRelicAPI struct {
 	client          *http.Client
 }
 
-func NewNewRelicAPI(cfg config.Config) *NewRelicAPI {
+func NewNewRelicAPI(c config.Config) *NewRelicAPI {
+	cfg = c
+
 	serverURL, err := url.Parse(cfg.NRApiServer)
 	if err != nil {
 		log.Fatal("Could not parse API URL: ", err)
@@ -73,7 +75,6 @@ func NewNewRelicAPI(cfg config.Config) *NewRelicAPI {
 }
 
 func (a *NewRelicAPI) req(path string, params string) ([]byte, error) {
-
 	u, err := url.Parse(a.server.String() + path)
 	if err != nil {
 		return nil, err

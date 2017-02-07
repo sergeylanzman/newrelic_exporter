@@ -4,6 +4,7 @@ import (
 	"time"
 	"io/ioutil"
 	"gopkg.in/yaml.v2"
+	"github.com/prometheus/log"
 )
 
 type Config struct {
@@ -38,6 +39,8 @@ func GetConfig(path string) (Config, error) {
 	if err != nil {
 		return config, err
 	}
+
+	log.Debugf("Config loaded: %v", config)
 
 	return config, err
 }
