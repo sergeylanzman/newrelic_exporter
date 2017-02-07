@@ -29,7 +29,7 @@ const ChunkSize = 10
 
 var cfg config.Config
 
-type NewRelicAPI struct {
+type API struct {
 	server          url.URL
 	apiKey          string
 	service		string
@@ -40,7 +40,7 @@ type NewRelicAPI struct {
 	client          *http.Client
 }
 
-func NewNewRelicAPI(c config.Config) *NewRelicAPI {
+func NewAPI(c config.Config) *API {
 	cfg = c
 
 	serverURL, err := url.Parse(cfg.NRApiServer)
@@ -65,7 +65,7 @@ func NewNewRelicAPI(c config.Config) *NewRelicAPI {
 		client.Transport = transport
 	}
 
-	return &NewRelicAPI{
+	return &API{
 		server: *serverURL,
 		apiKey: cfg.NRApiKey,
 		service: cfg.NRService,
@@ -74,7 +74,7 @@ func NewNewRelicAPI(c config.Config) *NewRelicAPI {
 	}
 }
 
-func (a *NewRelicAPI) req(path string, params string) ([]byte, error) {
+func (a *API) req(path string, params string) ([]byte, error) {
 	u, err := url.Parse(a.server.String() + path)
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (a *NewRelicAPI) req(path string, params string) ([]byte, error) {
 	return a.httpget(req, data)
 }
 
-func (a *NewRelicAPI) httpget(req *http.Request, in []byte) (out []byte, err error) {
+func (a *API) httpget(req *http.Request, in []byte) (out []byte, err error) {
 	resp, err := a.client.Do(req)
 	if err != nil {
 		return
@@ -159,7 +159,7 @@ type Application struct {
 	UsrSummary map[string]float64 `json:"end_user_summary"`
 }
 
-func (a *AppList) Get(api *NewRelicAPI) error {
+func (a *AppList) Get(api *API) error {
 	if len(cfg.NRApps) > 0 {
 		// Using local app list instead of getting it from API - one API call less
 		log.Infof("Getting application list from config: %v", cfg.NRApps)
@@ -194,7 +194,7 @@ func (a *AppList) Get(api *NewRelicAPI) error {
 
 type MetricNames map[string][]string
 
-func (m *MetricNames) Get(api *NewRelicAPI, appID int) error {
+func (m *MetricNames) Get(api *API, appID int) error {
 	log.Infof("Requesting metrics names for application id %d.", appID)
 	path := fmt.Sprintf("/v2/%s/%s/metrics.json", api.service, strconv.Itoa(appID))
 
@@ -284,7 +284,7 @@ type MetricData struct {
 	}
 }
 
-func (m *MetricData) Get(api *NewRelicAPI, appID int, names MetricNames) error {
+func (m *MetricData) Get(api *API, appID int, names MetricNames) error {
 	path := fmt.Sprintf("/v2/%s/%s/metrics/data.json", api.service, strconv.Itoa(appID))
 
 	var nameList []string

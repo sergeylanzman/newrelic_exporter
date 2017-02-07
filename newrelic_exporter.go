@@ -20,7 +20,7 @@ func main() {
 
 	cfg, err := config.GetConfig(configFile)
 
-	api := newrelic.NewNewRelicAPI(cfg)
+	api := newrelic.NewAPI(cfg)
 
 	exp := exporter.NewExporter(api)
 

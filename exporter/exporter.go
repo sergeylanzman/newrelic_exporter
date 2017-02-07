@@ -26,10 +26,10 @@ type Exporter struct {
 	duration, error prometheus.Gauge
 	totalScrapes    prometheus.Counter
 	metrics         map[string]prometheus.GaugeVec
-	api             *newrelic.NewRelicAPI
+	api             *newrelic.API
 }
 
-func NewExporter(api *newrelic.NewRelicAPI) *Exporter {
+func NewExporter(api *newrelic.API) *Exporter {
 	return &Exporter{
 		duration: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: NameSpace,
