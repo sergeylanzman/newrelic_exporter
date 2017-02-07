@@ -42,6 +42,7 @@ type Config struct {
 	NRService		string			`yaml:"api.service"`
 	NRApps			[]Application		`yaml:"api.apps"`
 	NRMetricFilters		[]string		`yaml:"api.metric-filters"`
+	NRValueFilters		[]string		`yaml:"api.value-filters"`
 
 	// Prometheus Exporter related settings
 	MetricPath		string			`yaml:"web.telemetry-path"`
@@ -251,6 +252,12 @@ func (m *MetricData) get(api *newRelicAPI, appID int, names MetricNames) error {
 
 			for _, thisName := range names {
 				params.Add("names[]", thisName)
+			}
+
+			if len(config.NRValueFilters) > 0 {
+				for _, valueFilter := range config.NRValueFilters {
+					params.Add("values[]", valueFilter)
+				}
 			}
 
 			params.Add("raw", "true")
