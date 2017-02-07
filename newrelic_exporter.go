@@ -398,7 +398,7 @@ func (e *Exporter) scrape(ch chan <- Metric) {
 
 			var data MetricData
 
-			//err = data.get(api, app.ID, names)
+			err = data.get(api, app.ID, names)
 			log.Infof("Scraped %v metric datas for app %v", len(data.Metric_Data.Metrics), app.ID)
 			if err != nil {
 				log.Error(err)
