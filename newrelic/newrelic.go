@@ -56,9 +56,8 @@ func NewAPI(c config.Config) *API {
 
 	client := &http.Client{Timeout: cfg.NRTimeout}
 
-	debugMode := true
-	if debugMode {
-		proxyUrl, _ := url.Parse("https://localhost:8888")
+	if len(cfg.DebugProxyAddress) > 0 {
+		proxyUrl, _ := url.Parse(cfg.DebugProxyAddress)
 		transport := &http.Transport{}
 		transport.Proxy = http.ProxyURL(proxyUrl)
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -81,7 +80,7 @@ func (a *API) req(path string, params string) ([]byte, error) {
 	}
 	u.RawQuery = params
 
-	log.Debug("Making API call: ", u.String())
+	//log.Debug("Making API call: ", u.String())
 
 	req := &http.Request{
 		Method: "GET",
@@ -152,14 +151,15 @@ type AppList struct {
 }
 
 type Application struct {
-	ID         int                `yaml:"id"`
-	Name       string             `yaml:"name"`
+	ID         int
+	Name       string
 	Health     string             `json:"health_status"`
 	AppSummary map[string]float64 `json:"application_summary"`
 	UsrSummary map[string]float64 `json:"end_user_summary"`
 }
 
 func (a *AppList) Get(api *API) error {
+	/*
 	if len(cfg.NRApps) > 0 {
 		// Using local app list instead of getting it from API - one API call less
 		log.Infof("Getting application list from config: %v", cfg.NRApps)
@@ -168,6 +168,7 @@ func (a *AppList) Get(api *API) error {
 		}
 		return nil
 	}
+	*/
 
 	log.Infof("Requesting application list from %s.", api.server.String())
 	body, err := api.req(fmt.Sprintf("/v2/%s.json", api.service), "")

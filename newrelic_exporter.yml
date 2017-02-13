@@ -14,6 +14,12 @@ api.timeout: 15s
 # See NR API docs for details: https://rpm.newrelic.com/api/explore
 api.service: "applications"
 
+# Time to cache application list. 0 by default
+#api.apps-list-cache-time: 1m
+
+# Time to cache metric names list. 0 by default
+#api.metric-names-cache-time: 1m
+
 # List of NewRelic application IDs. If none set than exporter will get app list from API
 api.apps:
 

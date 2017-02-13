@@ -22,7 +22,7 @@ func main() {
 
 	api := newrelic.NewAPI(cfg)
 
-	exp := exporter.NewExporter(api)
+	exp := exporter.NewExporter(api, cfg)
 
 	prometheus.MustRegister(exp)
 
