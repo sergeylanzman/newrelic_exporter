@@ -1,16 +1,16 @@
 package newrelic
 
 import (
-	"fmt"
-	"encoding/json"
 	"bytes"
-	"io"
-	"strconv"
-	"net/url"
-	"time"
-	"net/http"
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strconv"
+	"time"
 
 	"github.com/prometheus/log"
 	"github.com/tomnomnom/linkheader"
@@ -32,10 +32,10 @@ var cfg config.Config
 type API struct {
 	server          url.URL
 	apiKey          string
-	service		string
+	service         string
 	From            time.Time // remove
 	To              time.Time // remove
-	Period          int // remove
+	Period          int       // remove
 	unreportingApps bool
 	client          *http.Client
 }
@@ -65,11 +65,11 @@ func NewAPI(c config.Config) *API {
 	}
 
 	return &API{
-		server: *serverURL,
-		apiKey: cfg.NRApiKey,
+		server:  *serverURL,
+		apiKey:  cfg.NRApiKey,
 		service: cfg.NRService,
-		client: client,
-		Period: cfg.NRPeriod,
+		client:  client,
+		Period:  cfg.NRPeriod,
 	}
 }
 
@@ -160,14 +160,14 @@ type Application struct {
 
 func (a *AppList) Get(api *API) error {
 	/*
-	if len(cfg.NRApps) > 0 {
-		// Using local app list instead of getting it from API - one API call less
-		log.Infof("Getting application list from config: %v", cfg.NRApps)
-		for _, app := range cfg.NRApps {
-			a.Applications = append(a.Applications, Application{ID: app.Id, Name: app.Name})
+		if len(cfg.NRApps) > 0 {
+			// Using local app list instead of getting it from API - one API call less
+			log.Infof("Getting application list from config: %v", cfg.NRApps)
+			for _, app := range cfg.NRApps {
+				a.Applications = append(a.Applications, Application{ID: app.Id, Name: app.Name})
+			}
+			return nil
 		}
-		return nil
-	}
 	*/
 
 	log.Infof("Requesting application list from %s.", api.server.String())

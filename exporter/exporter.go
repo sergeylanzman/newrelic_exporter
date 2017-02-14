@@ -1,9 +1,9 @@
 package exporter
 
 import (
-	"time"
-	"sync"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/log"
@@ -34,7 +34,7 @@ type Exporter struct {
 	totalScrapes    prometheus.Counter
 	metrics         map[string]prometheus.GaugeVec
 	api             *newrelic.API
-	cfg config.Config
+	cfg             config.Config
 }
 
 func NewExporter(api *newrelic.API, cfg config.Config) *Exporter {
@@ -55,12 +55,12 @@ func NewExporter(api *newrelic.API, cfg config.Config) *Exporter {
 			Help:      "The last scrape error status.",
 		}),
 		metrics: map[string]prometheus.GaugeVec{},
-		api: api,
-		cfg: cfg,
+		api:     api,
+		cfg:     cfg,
 	}
 }
 
-func (e *Exporter) scrape(ch chan <- Metric) {
+func (e *Exporter) scrape(ch chan<- Metric) {
 	e.error.Set(0)
 	e.totalScrapes.Inc()
 
@@ -166,7 +166,7 @@ func (e *Exporter) scrape(ch chan <- Metric) {
 	wg.Wait()
 
 	close(ch)
-	e.duration.Set(float64(time.Now().UnixNano() - startTime.UnixNano()) / 1000000000)
+	e.duration.Set(float64(time.Now().UnixNano()-startTime.UnixNano()) / 1000000000)
 	log.Infof("Scrape finished in %v", time.Since(startTime))
 }
 
