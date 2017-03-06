@@ -15,12 +15,6 @@ import (
 // Namespace for metrics
 const NameSpace = "newrelic"
 
-// Last times of requesting apps list and metric names. Used for caching
-var appListLastTime, metricNamesLastTime time.Time
-
-var apps newrelic.AppList
-var names newrelic.MetricNames
-
 type Metric struct {
 	App   string
 	Name  string
@@ -29,12 +23,16 @@ type Metric struct {
 }
 
 type Exporter struct {
-	mu              sync.Mutex
-	duration, error prometheus.Gauge
-	totalScrapes    prometheus.Counter
-	metrics         map[string]prometheus.GaugeVec
-	api             *newrelic.API
-	cfg             config.Config
+	mu                                       sync.Mutex
+	duration, error                          prometheus.Gauge
+	totalScrapes                             prometheus.Counter
+	metrics                                  map[string]prometheus.GaugeVec
+	api                                      *newrelic.API
+	cfg                                      config.Config
+	apps                                     []newrelic.Application
+	names                                    map[int][]newrelic.MetricName
+	values                                   []string
+	appListLastScrape, metricNamesLastScrape time.Time
 }
 
 func NewExporter(api *newrelic.API, cfg config.Config) *Exporter {
@@ -57,31 +55,35 @@ func NewExporter(api *newrelic.API, cfg config.Config) *Exporter {
 		metrics: map[string]prometheus.GaugeVec{},
 		api:     api,
 		cfg:     cfg,
+		apps:    make([]newrelic.Application, 0),
+		names:   make(map[int][]newrelic.MetricName),
+		values:  make([]string, 0),
 	}
 }
 
-func (e *Exporter) scrape(ch chan<- Metric) {
+func (e *Exporter) scrape(from time.Time, to time.Time, ch chan<- Metric) {
 	e.error.Set(0)
 	e.totalScrapes.Inc()
 
 	startTime := time.Now()
-	log.Infof("Starting new scrape at %v.", startTime)
+	log.Infof("Starting new scrape at %v for period from %v to %v.", startTime, from.Format(time.Stamp), to.Format(time.Stamp))
 
-	if time.Since(appListLastTime) >= e.cfg.NRAppListCacheTime {
-		err := apps.Get(e.api)
+	if time.Since(e.appListLastScrape) >= e.cfg.NRAppListCacheTime {
+		var err error
+		e.apps, err = e.api.GetApplications()
 		if err != nil {
 			log.Error(err)
 			e.error.Set(1)
 		} else {
 			// Only successful tries should touch cache times
-			appListLastTime = time.Now()
-			log.Debugf("Application list updated at %v", appListLastTime)
+			e.appListLastScrape = time.Now()
+			log.Debugf("Application list updated at %v", e.appListLastScrape)
 		}
 	} else {
 		log.Debug("Applications list taken from cache")
 	}
 
-	for _, app := range apps.Applications {
+	for _, app := range e.apps {
 		for name, value := range app.AppSummary {
 			ch <- Metric{
 				App:   app.Name,
@@ -103,47 +105,43 @@ func (e *Exporter) scrape(ch chan<- Metric) {
 
 	var wg sync.WaitGroup
 
-	for i := range apps.Applications {
-		app := apps.Applications[i]
-
+	for _, app := range e.apps {
 		wg.Add(1)
-		api := e.api
 
-		go func() {
+		go func(app newrelic.Application) {
 			defer wg.Done()
 
 			var err error
+			var names []newrelic.MetricName
 
-			if time.Since(metricNamesLastTime) >= e.cfg.NRAppListCacheTime {
-				// Getting metric names
-				names = make(newrelic.MetricNames)
-
-				err = names.Get(api, app.ID)
+			if time.Since(e.metricNamesLastScrape) >= e.cfg.NRAppListCacheTime {
+				names, err = e.api.GetMetricNames(app.ID)
+				e.names[app.ID] = names
 				log.Infof("Scraped %v metric names for app %v", len(names), app.ID)
 				if err != nil {
 					log.Error(err)
 					e.error.Set(1)
 				} else {
 					// Only successful tries should touch cache times
-					metricNamesLastTime = time.Now()
-					log.Debugf("Metric names list updated at %v", appListLastTime)
+					e.metricNamesLastScrape = time.Now()
+					log.Debugf("Metric names list updated at %v", e.appListLastScrape)
 				}
 			} else {
 				log.Debug("Metrics names list taken from cache")
 			}
 
 			// Getting metric data
-			var data newrelic.MetricData
+			var data []newrelic.MetricData
 
-			err = data.Get(api, app.ID, names)
-			log.Infof("Scraped %v metric datas for app %v", len(data.Metric_Data.Metrics), app.ID)
+			data, err = e.api.GetMetricData(app.ID, e.names[app.ID], from, to)
+			log.Infof("Scraped %v metric datas for app %v", len(data), app.ID)
 			if err != nil {
 				log.Error(err)
 				e.error.Set(1)
 			}
 
 			// Sending metrics
-			for _, set := range data.Metric_Data.Metrics {
+			for _, set := range data {
 				if len(set.Timeslices) == 0 {
 					continue
 				}
@@ -160,17 +158,18 @@ func (e *Exporter) scrape(ch chan<- Metric) {
 					}
 				}
 			}
-		}()
+		}(app)
 	}
 
 	wg.Wait()
 
 	close(ch)
+
 	e.duration.Set(float64(time.Now().UnixNano()-startTime.UnixNano()) / 1000000000)
 	log.Infof("Scrape finished in %v", time.Since(startTime))
 }
 
-func (e *Exporter) recieve(ch <-chan Metric) {
+func (e *Exporter) receive(ch <-chan Metric) {
 	for metric := range ch {
 		id := fmt.Sprintf("%s_%s", NameSpace, metric.Name)
 
@@ -206,17 +205,15 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Align requests to minute boundary.
-	// As time.Round rounds to the nearest integar rather than floor or ceil,
-	// subtract 30 seconds from the time before rounding.
-	e.api.To = time.Now().Add(-time.Second * 30).Round(time.Minute).UTC()
-	e.api.From = e.api.To.Add(-time.Duration(e.api.Period) * time.Second)
+	var from, to time.Time
+	from = time.Now().Add(-1 * time.Minute).Truncate(time.Minute)
+	to = from.Add(time.Minute)
 
 	metricChan := make(chan Metric)
 
-	go e.scrape(metricChan)
+	go e.scrape(from, to, metricChan)
 
-	e.recieve(metricChan)
+	e.receive(metricChan)
 
 	ch <- e.duration
 	ch <- e.totalScrapes
