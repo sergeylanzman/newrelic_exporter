@@ -2,14 +2,12 @@ package exporter
 
 import (
 	"fmt"
-	"sync"
-	"time"
-
+	"github.com/mrf/newrelic_exporter/config"
+	"github.com/mrf/newrelic_exporter/newrelic"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/log"
-
-	"camino.ru/newrelic_exporter/config"
-	"camino.ru/newrelic_exporter/newrelic"
+	"sync"
+	"time"
 )
 
 // Namespace for metrics
