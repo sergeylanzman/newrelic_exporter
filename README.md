@@ -7,16 +7,18 @@ Requires a New Relic account.
 
 ### Running in a container
 
-	docker run jfindley/newrelic-exporter --api.key=********
+    cp newrelic_exporter.yml.example newrelic_exporter.yml
+	docker run mrf/newrelic-exporter
 
 ### From source
 
-	git clone https://github.com/jfindley/newrelic_exporter.git --branch release
+	git clone https://github.com/mrf/newrelic_exporter.git --branch release
 	cd newrelic_exporter
     make
+    cp newrelic_exporter.yml.example newrelic_exporter.yml
     ./newrelic_exporter
 
-## Flags
+## Configuration Values 
 
 Name               | Description
 -------------------|------------
