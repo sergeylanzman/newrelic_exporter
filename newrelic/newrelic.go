@@ -17,7 +17,7 @@ import (
 )
 
 // Module version
-const Version = "0.3b"
+const Version = "0.4b"
 
 // User-Agent string
 const UserAgent = "Prometheus-NewRelic-Exporter/" + Version
@@ -351,7 +351,10 @@ func (api *API) httpget(req *http.Request, in []byte) (out []byte, err error) {
 	}
 
 	if resp.StatusCode == 429 {
-		log.Info("API Limit Exceeded New Relic Returning 429 https://docs.newrelic.com/docs/apis/rest-api-v2/requirements/api-overload-protection-handling-429-errors")
+		log.Info("API Limit Exceeded, New Relic Returning 429 see: https://docs.newrelic.com/docs/apis/rest-api-v2/requirements/api-overload-protection-handling-429-errors")
+		overload_header := resp.Header["Newrelic-Overloadprotection-Reset"][0]
+		overload_time, _ := strconv.ParseInt(overload_header, 10, 64)
+		log.Info("Overload protection resets at: ", time.Unix(overload_time, 0))
 		return
 	}
 
