@@ -351,7 +351,7 @@ func (api *API) httpget(req *http.Request, in []byte) (out []byte, err error) {
 	}
 
 	if resp.StatusCode == 429 {
-		log.Info("API Limit Exceeded New Relic Returning 429")
+		log.Info("API Limit Exceeded New Relic Returning 429 https://docs.newrelic.com/docs/apis/rest-api-v2/requirements/api-overload-protection-handling-429-errors")
 		return
 	}
 
