@@ -349,6 +349,12 @@ func (api *API) httpget(req *http.Request, in []byte) (out []byte, err error) {
 	if err != nil {
 		return
 	}
+
+	if resp.StatusCode == 429 {
+		log.Info("API Limit Exceeded New Relic Returning 429")
+		return
+	}
+
 	resp.Body.Close()
 	out = append(in, body...)
 
