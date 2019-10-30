@@ -1,16 +1,19 @@
-FROM debian
+FROM golang:latest as builder
 
-COPY . /src
+COPY . /app
 
-RUN apt-get update \
-  && apt-get install -y curl make git mercurial \
-  && cd /src \
-  && make \
-  && apt-get purge -y curl make git mercurial \
-  && apt-get autoremove -y \
-  && rm -rf /var/lib/apt/lists/* \
-  && rm -rf /src/.build
+RUN cd /app \
+  && go get -v -d \
+  && CGO_ENABLED=0 go build -o newrelic_exporter
+
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /app
+
+COPY --from=builder /app/newrelic_exporter .
 
 EXPOSE 9126
 
-ENTRYPOINT ["/src/newrelic_exporter"]
+ENTRYPOINT ["/app/newrelic_exporter"]
