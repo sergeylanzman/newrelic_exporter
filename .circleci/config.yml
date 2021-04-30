@@ -1,0 +1,18 @@
+version: 2
+jobs:
+  build:
+		docker:
+      # image version
+			- image: cimg/go:1.16
+
+    steps:
+      - checkout
+      - run:
+          name: build
+          command: |
+            cp newrelic_exporter.yml.example newrelic_exporter.yml
+            make
+      - run:
+          name: test
+          command: |
+            ./newrelic_exporter
