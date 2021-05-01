@@ -1,5 +1,5 @@
 # NewRelic API key. Mandatory
-api.key: 
+api.key: CHANGEME 
 
 # API location
 api.server:	https://api.newrelic.com
@@ -14,7 +14,7 @@ api.timeout: 15s
 # Mandatory
 # This is part of API path in between of API version and app ID.
 # See NR API docs for details: https://rpm.newrelic.com/api/explore
-api.service: 
+api.service: applications
 
 # Time to cache application list. 0 by default
 api.apps-list-cache-time: 1h
