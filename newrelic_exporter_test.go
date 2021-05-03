@@ -2,14 +2,18 @@ package main
 
 import (
 	"crypto/tls"
+	"flag"
 	"fmt"
+	"github.com/mrf/newrelic_exporter/config"
+	"github.com/mrf/newrelic_exporter/exporter"
+	"github.com/mrf/newrelic_exporter/newrelic"
+	"github.com/prometheus/client_golang/prometheus"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
-
 var testApiKey string = "205071e37e95bdaa327c62ccd3201da9289ccd17"
 var testApiAppId int = 9045822
 var testTimeout time.Duration = 5 * time.Second
@@ -24,15 +28,11 @@ func TestAppListGet(t *testing.T) {
 
 	defer ts.Close()
 
-	api := NewNewRelicAPI(ts.URL, testApiKey, testTimeout)
-	api.client = &http.Client{
-		Timeout: testTimeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
+	var configFile string
+	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
+	flag.Parse()
+	cfg, err := config.GetConfig(configFile)
+	api := newrelic.NewAPI(cfg)
 
 	var app AppList
 
@@ -80,15 +80,11 @@ func TestMetricNamesGet(t *testing.T) {
 
 	defer ts.Close()
 
-	api := NewNewRelicAPI(ts.URL, testApiKey, testTimeout)
-	api.client = &http.Client{
-		Timeout: testTimeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
+	var configFile string
+	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
+	flag.Parse()
+	cfg, err := config.GetConfig(configFile)
+	api := newrelic.NewAPI(cfg)
 
 	var names MetricNames
 
@@ -123,20 +119,16 @@ func TestMetricValuesGet(t *testing.T) {
 
 	defer ts.Close()
 
-	api := NewNewRelicAPI(ts.URL, testApiKey, testTimeout)
-	api.client = &http.Client{
-		Timeout: testTimeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
+	var configFile string
+	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
+	flag.Parse()
+	cfg, err := config.GetConfig(configFile)
+	api := newrelic.NewAPI(cfg)
 
 	var data MetricData
-	var names MetricNames
+	var names []MetricName
 
-	err = names.get(api, testApiAppId)
+	err = api.GetMetricNames(testApiAppId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,22 +171,18 @@ func TestScrapeAPI(t *testing.T) {
 
 	defer ts.Close()
 
-	exporter := NewExporter()
-	exporter.api = NewNewRelicAPI(ts.URL, testApiKey, testTimeout)
-	exporter.api.client = &http.Client{
-		Timeout: testTimeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
+	var configFile string
+	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
+	flag.Parse()
+	cfg, err := config.GetConfig(configFile)
+	api := newrelic.NewAPI(cfg)
+	exporter := exporter.NewExporter(api,cfg)
 
-	var recieved []Metric
+	var recieved []prometheus.Metric
 
-	metrics := make(chan Metric)
+	metrics := make(chan prometheus.Metric)
 
-	go exporter.scrape(metrics)
+	go exporter.Collect(metrics)
 
 	for m := range metrics {
 		recieved = append(recieved, m)

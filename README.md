@@ -39,3 +39,7 @@ api.include-values          | List of values to filter by to reduce number of AP
 web.listen-address          | Address to listen on for web interface and telemetry.  Port defaults to 9126.
 web.telemetry-path          | Path under which to expose metrics.
 debug.proxy-address         | Proxy settings for debugging
+
+## Testing
+
+`go test`
