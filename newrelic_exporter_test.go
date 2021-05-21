@@ -192,7 +192,7 @@ func TestScrapeAPI(t *testing.T) {
 
 func testServer() (ts *httptest.Server, err error) {
 
-	ts = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Header.Get("X-Api-Key") != testApiKey {
 			w.WriteHeader(403)
