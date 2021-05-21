@@ -31,6 +31,7 @@ func TestAppListGet(t *testing.T) {
 	flag.StringVar(&configFile, "config", "_testing/newrelic_exporter_test_config.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 	cfg, err := config.GetConfig(configFile)
+	cfg.NRApiServer = ts.URL
 	api := newrelic.NewAPI(cfg)
 
 	app,err := api.GetApplications()
@@ -81,6 +82,7 @@ func TestMetricNamesGet(t *testing.T) {
 	flag.StringVar(&configFile, "config", "_testing/newrelic_exporter_test_config.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 	cfg, err := config.GetConfig(configFile)
+	cfg.NRApiServer = ts.URL
 	api := newrelic.NewAPI(cfg)
 
 	names,err := api.GetMetricNames(testApiAppId)
@@ -118,6 +120,7 @@ func TestMetricValuesGet(t *testing.T) {
 	flag.StringVar(&configFile, "config", "_testing/newrelic_exporter_test_config.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 	cfg, err := config.GetConfig(configFile)
+	cfg.NRApiServer = ts.URL
 	api := newrelic.NewAPI(cfg)
 
 	names,err := api.GetMetricNames(testApiAppId)
@@ -167,6 +170,7 @@ func TestScrapeAPI(t *testing.T) {
 	flag.StringVar(&configFile, "config", "_testing/newrelic_exporter_test_config.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 	cfg, err := config.GetConfig(configFile)
+	cfg.NRApiServer = ts.URL
 	api := newrelic.NewAPI(cfg)
 	exporter := exporter.NewExporter(api,cfg)
 
