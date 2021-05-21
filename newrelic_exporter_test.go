@@ -28,7 +28,7 @@ func TestAppListGet(t *testing.T) {
 	defer ts.Close()
 
 	var configFile string
-	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
+	flag.StringVar(&configFile, "config", "_testing/newrelic_exporter_test_config.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 	cfg, err := config.GetConfig(configFile)
 	api := newrelic.NewAPI(cfg)
@@ -78,7 +78,7 @@ func TestMetricNamesGet(t *testing.T) {
 	defer ts.Close()
 
 	var configFile string
-	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
+	flag.StringVar(&configFile, "config", "_testing/newrelic_exporter_test_config.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 	cfg, err := config.GetConfig(configFile)
 	api := newrelic.NewAPI(cfg)
@@ -115,7 +115,7 @@ func TestMetricValuesGet(t *testing.T) {
 	defer ts.Close()
 
 	var configFile string
-	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
+	flag.StringVar(&configFile, "config", "_testing/newrelic_exporter_test_config.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 	cfg, err := config.GetConfig(configFile)
 	api := newrelic.NewAPI(cfg)
@@ -134,7 +134,7 @@ func TestMetricValuesGet(t *testing.T) {
 		t.Fatal("Expected 1 metric sets")
 	}
 
-	if len(data[0].) != 1 {
+	if len(data[0].Timeslices) != 1 {
 		t.Fatal("Expected 1 timeslice")
 	}
 
@@ -164,7 +164,7 @@ func TestScrapeAPI(t *testing.T) {
 	defer ts.Close()
 
 	var configFile string
-	flag.StringVar(&configFile, "config", "newrelic_exporter.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
+	flag.StringVar(&configFile, "config", "_testing/newrelic_exporter_test_config.yml", "Config file path. Defaults to 'newrelic_exporter.yml'")
 	flag.Parse()
 	cfg, err := config.GetConfig(configFile)
 	api := newrelic.NewAPI(cfg)

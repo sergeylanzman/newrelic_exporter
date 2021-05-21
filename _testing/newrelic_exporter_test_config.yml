@@ -1,0 +1,42 @@
+# NewRelic API key. Mandatory
+api.key: "205071e37e95bdaa327c62ccd3201da9289ccd17"
+
+# API location
+api.server:	https://api.newrelic.com
+
+# Period of data to request, in seconds
+api.period: 60
+
+# Period of time to wait for an API response
+api.timeout: 15s
+
+# Name of NewRelic service to acquire metrics from.
+# Mandatory
+# This is part of API path in between of API version and app ID.
+# See NR API docs for details: https://rpm.newrelic.com/api/explore
+api.service: applications
+
+# Time to cache application list. 0 by default
+api.apps-list-cache-time: 1h
+
+# Time to cache metric names list. 0 by default
+api.metric-names-cache-time: 1h
+
+# Filter available applications
+api.include-apps:
+
+# List of filters for metric names. Corresponds to 'name' parameter of metrics.json. Each line will generate at least one separate API request so use them wisely.
+# At least one should be present
+api.include-metric-filters:
+
+# List of value names to collect. If empty - all possible values will be collected
+api.include-values:
+
+# Address to listen on for web interface and telemetry. Port defaults to 9126.
+web.listen-address:	":9126"
+
+# Path under which to expose metrics. Defaults to '/metrics'
+web.telemetry-path: "/metrics"
+
+# Debugging proxy address
+#debug.proxy-address: "https://localhost:8888"
