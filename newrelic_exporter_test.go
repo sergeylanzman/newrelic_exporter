@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"github.com/mrf/newrelic_exporter/config"
@@ -34,18 +33,16 @@ func TestAppListGet(t *testing.T) {
 	cfg, err := config.GetConfig(configFile)
 	api := newrelic.NewAPI(cfg)
 
-	var app AppList
-
-	err = app.get(api)
+	app,err := api.GetApplications()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(app.Applications) != 1 {
-		t.Fatal("Expected 1 application, got", len(app.Applications))
+	if len(app) != 1 {
+		t.Fatal("Expected 1 application, got", len(app))
 	}
 
-	a := app.Applications[0]
+	a := app[0]
 
 	switch {
 
@@ -86,25 +83,23 @@ func TestMetricNamesGet(t *testing.T) {
 	cfg, err := config.GetConfig(configFile)
 	api := newrelic.NewAPI(cfg)
 
-	var names MetricNames
-
-	err = names.get(api, testApiAppId)
+	names,err := api.GetMetricNames(testApiAppId)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(names.Metrics) != 2 {
-		t.Fatal("Expected 2 name sets, got", len(names.Metrics))
+	if len(names) != 2 {
+		t.Fatal("Expected 2 name sets, got", len(names))
 	}
 
-	if len(names.Metrics[0].Values) != 10 {
+	if len(names[0].ValueNames) != 10 {
 		t.Fatal("Expected 10 metric names")
 	}
 
-	if names.Metrics[0].Name != "Datastore/statement/JDBC/messages/insert" {
+	if names[0].Name != "Datastore/statement/JDBC/messages/insert" {
 		t.Fatal("Wrong application name")
 	}
-	if names.Metrics[1].Name != "Datastore/statement/JDBC/messages/update" {
+	if names[1].Name != "Datastore/statement/JDBC/messages/update" {
 		t.Fatal("Wrong application name")
 	}
 
@@ -125,28 +120,25 @@ func TestMetricValuesGet(t *testing.T) {
 	cfg, err := config.GetConfig(configFile)
 	api := newrelic.NewAPI(cfg)
 
-	var data MetricData
-	var names []MetricName
-
-	err = api.GetMetricNames(testApiAppId)
+	names,err := api.GetMetricNames(testApiAppId)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = data.get(api, testApiAppId, names)
+	data,err := api.GetMetricData(testApiAppId,names, time.Now(),time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(data.Metric_Data.Metrics) != 1 {
+	if len(data) != 1 {
 		t.Fatal("Expected 1 metric sets")
 	}
 
-	if len(data.Metric_Data.Metrics[0].Timeslices) != 1 {
+	if len(data[0].) != 1 {
 		t.Fatal("Expected 1 timeslice")
 	}
 
-	appData := data.Metric_Data.Metrics[0].Timeslices[0]
+	appData := data[0].Timeslices[0]
 
 	if len(appData.Values) != 10 {
 		t.Fatal("Expected 10 data points")
